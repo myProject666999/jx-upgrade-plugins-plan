@@ -1,6 +1,6 @@
 ## jx upgrade plugins
 
-Upgrades all the plugins in your local JayeX CLI
+Upgrades all of the plugins in your local JayeX CLI
 
 ### Usage
 
@@ -10,21 +10,62 @@ jx upgrade plugins
 
 ### Synopsis
 
-Upgrades all the plugins in your local JayeX CLI
+Upgrades all of the plugins in your local JayeX CLI
 
 ### Examples
 
   # upgrades your plugin binaries
   jx upgrade plugins
+  
+  # show what an upgrade would do without installing anything
+  jx upgrade plugins --dry-run
 
 ### Options
 
 ```
       --boot          only install plugins required for boot
+      --dry-run       show the upgrade plan without installing plugins, running hooks or creating the plugin directory
   -h, --help          help for plugins
-  -m, --mandatory     if set lets ignore optional plugins
+  -m, --mandatory     only upgrade plugins in the top level jx CLI and ignore any extra plugins found in the plugin directory
       --path string   creates a symlink to the binary plugins in this bin path dir (default "/usr/bin")
 ```
+
+### Upgrade plan
+
+`jx upgrade plugins` prints a plan before it changes anything, and `--dry-run` prints the plan and stops.
+Every line is tab separated with a fixed field order, so the output can be compared with a plain text diff.
+
+| Line | Fields | Meaning |
+| --- | --- | --- |
+| `PLUGIN  TARGET  INSTALLED  ACTION` | | header |
+| `jx-gitops  1.4.24  1.4.24,1.0.0  satisfied` | name, target version, installed versions, action | one declared plugin, in `plugins.Plugins` order. `INSTALLED` is comma separated and sorted newest first, and is empty when nothing is installed. |
+| `EXTRA-PLUGINS` | | start of the plugins found in the plugin directory but not declared; omitted when there are none |
+| `jx-foo  unknown-source  0.1.0  skip-unknown-source` | name, target, installed versions, action | one extra plugin, sorted by name |
+| `NOTE  installs-are-re-checked-against-the-plugin-directory-at-execution` | | the plugin directory is re-read before each install |
+| `SUMMARY  satisfied=1  install=1  ...` | action counts | one field per action, always in the same order |
+
+The `TARGET` field is a version for declared plugins. For an extra plugin it is `unknown-source` when
+nothing in the plugin directory records where the plugin came from, or `query-latest-at-execution` when it
+does. A dry run never queries the network: with no local evidence for any extra plugin, all of them are
+reported as `unknown-source` and skipped, even if a plugin with that name exists upstream.
+
+Actions:
+
+| Action | Execution does |
+| --- | --- |
+| `satisfied` | nothing |
+| `install` | installs the target version |
+| `install-and-run-hook` | installs the target version, then runs the plugin's hook |
+| `run-hook` | the target version is installed; runs the plugin's hook |
+| `query-latest-at-execution` | looks up the latest release at execution time; a failure only warns |
+| `skip-unknown-source` | nothing; warns that the plugin's source is unknown |
+
+Additionally, `RECHECK` lines report plugins whose installed versions changed between planning and
+execution, and `FAILED` lines report plugins that failed. A failed plugin no longer stops the remaining
+plugins; the run continues and exits non-zero with a summary of the failures.
+
+The hooks are the same commands as before: `gitops` runs `plugin upgrade --path <path>` in `--boot` mode,
+and `secret` runs `plugins upgrade` outside `--boot` mode.
 
 ### SEE ALSO
 

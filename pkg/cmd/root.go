@@ -169,11 +169,6 @@ func handleCommand(cmd *cobra.Command, args []string) {
 	}
 	if len(args) > 1 {
 		cmdPathPieces := args[1:]
-		pluginDir, err := homedir.DefaultPluginBinDir()
-		if err != nil {
-			log.Logger().Errorf("%v", err)
-			os.Exit(1)
-		}
 
 		// only look for suitable executables if
 		// the specified command does not already exist
@@ -189,6 +184,14 @@ func handleCommand(cmd *cobra.Command, args []string) {
 			case "help", cobra.ShellCompRequestCmd, cobra.ShellCompNoDescRequestCmd, "completion":
 				// Don't search for a plugin
 			default:
+				// resolving the plugin directory creates it, so it is only done when a plugin is
+				// actually looked up; creating it for every invocation left commands like
+				// "upgrade plugins --dry-run" with a side effect before they even ran
+				pluginDir, err := homedir.DefaultPluginBinDir()
+				if err != nil {
+					log.Logger().Errorf("%v", err)
+					os.Exit(1)
+				}
 				if err := handleEndpointExtensions(cmdPathPieces, pluginDir); err != nil {
 					log.Logger().Errorf("%v", err)
 					// Adding plugins to cmd to get correct suggestions for misspelling
